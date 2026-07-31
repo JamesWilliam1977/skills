@@ -177,6 +177,33 @@ describe('checkWellKnownForUpdates', () => {
     expect(result.removedSkills).toEqual(['beta-skill']);
   });
 
+  it('reports skills present upstream but not installed as new', async () => {
+    const items: WellKnownUpdateItem[] = [
+      { name: 'alpha-skill', digest: await digestOf('alpha-skill') },
+    ];
+    stubWellKnownServer(v1Index(['alpha-skill', 'beta-skill']));
+    const result = await checkWellKnownForUpdates(BASE_URL, items);
+    expect(result.status).toBe('current');
+    if (result.status !== 'current') return;
+    expect(result.newSkills).toEqual(['beta-skill']);
+  });
+
+  it('reports new skills alongside changes', async () => {
+    const alphaDigest = await digestOf('alpha-skill');
+    const changedContents = {
+      ...V1_CONTENTS,
+      'alpha-skill': skillMd('alpha-skill', '# Alpha v2 CHANGED'),
+    };
+    stubWellKnownServer(v1Index(['alpha-skill', 'beta-skill']), changedContents);
+    const result = await checkWellKnownForUpdates(BASE_URL, [
+      { name: 'alpha-skill', digest: alphaDigest },
+    ]);
+    expect(result.status).toBe('changed');
+    if (result.status !== 'changed') return;
+    expect(result.changedSkills).toEqual(['alpha-skill']);
+    expect(result.newSkills).toEqual(['beta-skill']);
+  });
+
   it('compares v2 digests without fetching skill files', async () => {
     const mock = stubWellKnownServer(
       v2Index([
