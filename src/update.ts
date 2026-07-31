@@ -301,8 +301,13 @@ export interface WellKnownUpdateItem {
 
 export type WellKnownCheckResult =
   | { status: 'error' }
-  | { status: 'current' }
-  | { status: 'changed'; changedSkills: string[]; removedSkills: string[] };
+  | { status: 'current'; newSkills: string[] }
+  | {
+      status: 'changed';
+      changedSkills: string[];
+      removedSkills: string[];
+      newSkills: string[];
+    };
 
 export async function checkWellKnownForUpdates(
   baseUrl: string,
@@ -318,6 +323,10 @@ export async function checkWellKnownForUpdates(
 
   const byName = new Map(indexResult.entries.map((entry) => [entry.name, entry]));
   const removedSkills = items.filter((item) => !byName.has(item.name)).map((item) => item.name);
+  const localNames = new Set(items.map((item) => item.name));
+  const newSkills = indexResult.entries
+    .map((entry) => entry.name)
+    .filter((name) => !localNames.has(name));
   const changedSkills: string[] = [];
   const needsContentCheck: WellKnownUpdateItem[] = [];
 
@@ -355,9 +364,20 @@ export async function checkWellKnownForUpdates(
   }
 
   if (changedSkills.length === 0 && removedSkills.length === 0) {
-    return { status: 'current' };
+    return { status: 'current', newSkills };
   }
-  return { status: 'changed', changedSkills, removedSkills };
+  return { status: 'changed', changedSkills, removedSkills, newSkills };
+}
+
+function printNewSkills(baseUrl: string, newSkills: string[], isGlobal: boolean): void {
+  if (newSkills.length === 0) return;
+  const names = newSkills.map(sanitizeMetadata);
+  console.log(
+    `  ${DIM}${newSkills.length} new skill(s) available from this source:${RESET} ${names.join(', ')}`
+  );
+  console.log(
+    `    ${DIM}To install: ${TEXT}npx skills add ${baseUrl} --skill ${names.join(' ')}${isGlobal ? ' -g' : ''}${RESET}`
+  );
 }
 
 export async function processWellKnownUpdates(
@@ -379,11 +399,15 @@ export async function processWellKnownUpdates(
       continue;
     }
 
-    if (result.status === 'current') continue;
+    if (result.status === 'current') {
+      printNewSkills(baseUrl, result.newSkills, isGlobal);
+      continue;
+    }
 
     changed = true;
 
     await promptDeletions(baseUrl, result.removedSkills, isGlobal, options);
+    printNewSkills(baseUrl, result.newSkills, isGlobal);
 
     if (result.changedSkills.length === 0) continue;
 
