@@ -213,4 +213,19 @@ describe('checkWellKnownForUpdates', () => {
     if (result.status !== 'changed') return;
     expect(result.changedSkills).toEqual(['alpha-skill']);
   });
+
+  it('marks every v1 index fetch and downloads only tracked skill files', async () => {
+    const alphaDigest = await digestOf('alpha-skill');
+    const mock = stubWellKnownServer(v1Index(['alpha-skill', 'beta-skill']));
+    await checkWellKnownForUpdates(BASE_URL, [{ name: 'alpha-skill', digest: alphaDigest }]);
+    const indexCalls = mock.mock.calls.filter((call) => String(call[0]).endsWith('/index.json'));
+    expect(indexCalls.length).toBeGreaterThan(0);
+    for (const call of indexCalls) {
+      expect(new Headers((call[1] as RequestInit)?.headers).get('X-Skills-Update-Check')).toBe('1');
+    }
+    const fileCalls = mock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.endsWith('/SKILL.md'));
+    expect(fileCalls).toEqual([`${BASE_URL}/.well-known/skills/alpha-skill/SKILL.md`]);
+  });
 });

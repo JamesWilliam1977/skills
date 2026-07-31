@@ -240,6 +240,41 @@ export async function getProjectSkillsForUpdate(
   return skills;
 }
 
+export async function promptDeletions(
+  source: string,
+  deletedSkills: string[],
+  isGlobal: boolean,
+  options: UpdateCheckOptions
+): Promise<void> {
+  if (deletedSkills.length === 0) return;
+
+  console.log();
+  console.log(
+    `${DIM}Warning:${RESET} The following skills from ${DIM}${source}${RESET} appear to have been deleted upstream:`
+  );
+  for (const s of deletedSkills) {
+    console.log(`  ${DIM}•${RESET} ${s}`);
+  }
+
+  const isNonInteractive = options.yes || !process.stdin.isTTY;
+
+  if (isNonInteractive) {
+    console.log(`${DIM}Skipping deletion in non-interactive mode.${RESET}`);
+    return;
+  }
+
+  const confirmed = await p.confirm({
+    message: `Would you like to remove the local copies of these deleted skills?`,
+  });
+
+  if (confirmed && !p.isCancel(confirmed)) {
+    for (const s of deletedSkills) {
+      console.log(`${DIM}Removing${RESET} ${s}…`);
+      await removeCommand([s], { yes: true, global: isGlobal });
+    }
+  }
+}
+
 export async function checkAndPromptForDeletions(
   source: string,
   allLockedForSource: string[],
@@ -254,32 +289,7 @@ export async function checkAndPromptForDeletions(
     return !discoveredPaths.includes(entry.skillPath);
   });
 
-  if (deletedSkills.length > 0) {
-    console.log();
-    console.log(
-      `${DIM}Warning:${RESET} The following skills from ${DIM}${source}${RESET} appear to have been deleted upstream:`
-    );
-    for (const s of deletedSkills) {
-      console.log(`  ${DIM}•${RESET} ${s}`);
-    }
-
-    const isNonInteractive = options.yes || !process.stdin.isTTY;
-
-    if (isNonInteractive) {
-      console.log(`${DIM}Skipping deletion in non-interactive mode.${RESET}`);
-    } else {
-      const confirmed = await p.confirm({
-        message: `Would you like to remove the local copies of these deleted skills?`,
-      });
-
-      if (confirmed && !p.isCancel(confirmed)) {
-        for (const s of deletedSkills) {
-          console.log(`${DIM}Removing${RESET} ${s}…`);
-          await removeCommand([s], { yes: true, global: isGlobal });
-        }
-      }
-    }
-  }
+  await promptDeletions(source, deletedSkills, isGlobal, options);
   return deletedSkills;
 }
 
@@ -324,7 +334,14 @@ export async function checkWellKnownForUpdates(
   }
 
   if (needsContentCheck.length > 0) {
-    const skills = await wellKnownProvider.fetchAllSkills(baseUrl).catch(() => []);
+    const tracked = new Set(needsContentCheck.map((item) => item.name));
+    const skills = (
+      await Promise.all(
+        indexResult.entries
+          .filter((entry) => tracked.has(entry.name))
+          .map((entry) => wellKnownProvider.fetchSkillByEntry(entry).catch(() => null))
+      )
+    ).filter((skill): skill is NonNullable<typeof skill> => skill !== null);
     if (skills.length === 0) return { status: 'error' };
     const digests = new Map(
       skills.map((skill) => [skill.installName, computeWellKnownSkillDigest(skill)])
@@ -341,41 +358,6 @@ export async function checkWellKnownForUpdates(
     return { status: 'current' };
   }
   return { status: 'changed', changedSkills, removedSkills };
-}
-
-async function promptWellKnownDeletions(
-  source: string,
-  deletedSkills: string[],
-  isGlobal: boolean,
-  options: UpdateCheckOptions
-): Promise<void> {
-  if (deletedSkills.length === 0) return;
-
-  console.log();
-  console.log(
-    `${DIM}Warning:${RESET} The following skills from ${DIM}${source}${RESET} appear to have been deleted upstream:`
-  );
-  for (const s of deletedSkills) {
-    console.log(`  ${DIM}•${RESET} ${s}`);
-  }
-
-  const isNonInteractive = options.yes || !process.stdin.isTTY;
-
-  if (isNonInteractive) {
-    console.log(`${DIM}Skipping deletion in non-interactive mode.${RESET}`);
-    return;
-  }
-
-  const confirmed = await p.confirm({
-    message: `Would you like to remove the local copies of these deleted skills?`,
-  });
-
-  if (confirmed && !p.isCancel(confirmed)) {
-    for (const s of deletedSkills) {
-      console.log(`${DIM}Removing${RESET} ${s}…`);
-      await removeCommand([s], { yes: true, global: isGlobal });
-    }
-  }
 }
 
 export async function processWellKnownUpdates(
@@ -401,7 +383,7 @@ export async function processWellKnownUpdates(
 
     changed = true;
 
-    await promptWellKnownDeletions(baseUrl, result.removedSkills, isGlobal, options);
+    await promptDeletions(baseUrl, result.removedSkills, isGlobal, options);
 
     if (result.changedSkills.length === 0) continue;
 
