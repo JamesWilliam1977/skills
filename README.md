@@ -3,7 +3,7 @@
 The CLI for the open agent skills ecosystem.
 
 <!-- agent-list:start -->
-Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#supported-agents).
+Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [72 more](#supported-agents).
 <!-- agent-list:end -->
 
 [![skills.sh](https://skills.sh/b/vercel-labs/skills)](https://skills.sh/vercel-labs/skills)
@@ -289,6 +289,7 @@ Skills can be installed to any of these agents:
 | Kode | `kode` | `.kode/skills/` | `~/.kode/skills/` |
 | Lingma | `lingma` | `.lingma/skills/` | `~/.lingma/skills/` |
 | MCPJam | `mcpjam` | `.mcpjam/skills/` | `~/.mcpjam/skills/` |
+| MiniMax Code | `minimax-code` | `.minimax/skills/` | `~/.minimax/skills/` |
 | Mistral Vibe | `mistral-vibe` | `.vibe/skills/` | `~/.vibe/skills/` |
 | Moxby | `moxby` | `.moxby/skills/` | `~/.moxby/skills/` |
 | Mux | `mux` | `.mux/skills/` | `~/.mux/skills/` |
@@ -376,12 +377,13 @@ metadata:
 ### Skill Discovery
 
 The CLI searches for skills in these locations within a repository. Each
-skill container directory is walked one level deep for the common flat
-layout (`skills/<name>/SKILL.md`) and one extra level deep for catalog
-layouts (`skills/<category>/<name>/SKILL.md`). A `SKILL.md` discovered at
-the shallower level shadows anything nested below it. Use `--full-depth`
-to also discover `SKILL.md` files outside these container directories
-(e.g. under `examples/` or `tests/`).
+skill container directory is walked up to three levels deep, covering flat
+layouts (`skills/<name>/SKILL.md`) and catalog layouts with one or two category
+levels (`skills/<category>/<name>/SKILL.md` or
+`skills/<category>/<category>/<name>/SKILL.md`). A `SKILL.md` discovered at a
+shallower level shadows anything nested below it. Use `--full-depth` to also
+discover `SKILL.md` files outside these container directories (e.g. under
+`examples/` or `tests/`).
 
 <!-- skill-discovery:start -->
 - Root directory (if it contains `SKILL.md`)
@@ -421,6 +423,7 @@ to also discover `SKILL.md` files outside these container directories
 - `.kode/skills/`
 - `.lingma/skills/`
 - `.mcpjam/skills/`
+- `.minimax/skills/`
 - `.vibe/skills/`
 - `.moxby/skills/`
 - `.mux/skills/`
@@ -462,7 +465,7 @@ If `.claude-plugin/marketplace.json` or `.claude-plugin/plugin.json` exists, ski
 }
 ```
 
-This enables compatibility with the [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) ecosystem. Skill paths declared in a manifest are searched at their declared depth and are not subject to the depth-2 catalog walk described above.
+This enables compatibility with the [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) ecosystem. Skill paths declared in a manifest are searched at their declared depth and are not subject to the bounded depth-3 catalog walk described above.
 
 If no skills are found in standard locations, a recursive search is performed.
 
