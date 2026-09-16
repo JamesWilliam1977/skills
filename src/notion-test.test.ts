@@ -116,6 +116,29 @@ describe('Notion pack prototype', () => {
     ]);
   });
 
+  it('skips untitled packs without dropping valid packs', async () => {
+    const runNtn = vi.fn<NtnRunner>(async () =>
+      listResponse([
+        {
+          id: '3c2e06b0-59c4-801c-8759-e7644ddb1138',
+          name: '',
+          description: '',
+          version_id: 'a'.repeat(64),
+        },
+        {
+          id: 'dbd17050-94d4-4c94-b311-ac5f9e49ea87',
+          name: 'Weekly Metrics Review',
+          description: 'Analyzes a metrics table.',
+          version_id: 'b'.repeat(64),
+        },
+      ])
+    );
+
+    const packs = await fetchNotionPacks({ runNtn });
+
+    expect(packs.map((pack) => pack.name)).toEqual(['Weekly Metrics Review']);
+  });
+
   it('percent-encodes opaque pack IDs for lazy directory lookup', async () => {
     const pack: NotionPack = {
       id: '>tO?',

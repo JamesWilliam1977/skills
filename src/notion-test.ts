@@ -91,14 +91,20 @@ function optionalMetadata(value: unknown, field: string): string {
   return sanitizeMetadata(value);
 }
 
-function parsePack(value: unknown): NotionPack {
+function parsePack(value: unknown): NotionPack | null {
   if (!isRecord(value)) {
     throw new Error('Notion Agent Plugins response contains an invalid pack');
   }
 
+  if (typeof value.name !== 'string') {
+    throw new Error('Notion Agent Plugins response is missing pack.name');
+  }
+  const name = sanitizeMetadata(value.name);
+  if (!name) return null;
+
   return {
     id: assertString(value.id, 'pack.id'),
-    name: sanitizeMetadata(assertString(value.name, 'pack.name')),
+    name,
     description: optionalMetadata(value.description, 'pack.description'),
     version_id: assertString(value.version_id, 'pack.version_id'),
   };
@@ -117,8 +123,10 @@ function parsePackList(value: unknown): NotionPackListResponse {
     throw new Error('Notion Agent Plugins list response has an invalid next_cursor');
   }
 
+  const results = value.results.map(parsePack).filter((pack) => pack !== null);
+
   return {
-    results: value.results.map(parsePack),
+    results,
     next_cursor: nextCursor,
     has_more: value.has_more,
   };
